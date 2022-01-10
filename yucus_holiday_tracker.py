@@ -138,39 +138,75 @@ class HolidayList:
         # return your holidays
         return weekHolidays
 
-    def displayHolidaysInWeek(self, pickedYear, pickedWeek):
-        # Use your filter_holidays_by_week to get list of holidays within a week as a parameter
-        output = self.filter_holidays_by_week(pickedYear, pickedWeek)
-        # Output formated holidays in the week.
-        print(f'These are the holidays for week {pickedWeek}:')
-        for x in (output):
-            print(Holiday(x['name'], x['date']))
+    def displayHolidaysInWeek(self, pickedYear, pickedWeek, weather=None):
+        
+        holidaysInWeek = self.filter_holidays_by_week(pickedYear, pickedWeek) #returns list of holidays
+        if weather is None:# Use your filter_holidays_by_week to get list of holidays within a week as a parameter
+            # Output formated holidays in the week.
+            print(f'These are the holidays for week {pickedWeek}:')
+            for x in holidaysInWeek:
+                print(Holiday(x['name'], x['date']))
+        else:
+            print(f'These are the holidays for week {pickedWeek}:')
+            for x in holidaysInWeek:
+                print(Holiday(x['name'], x['date']))
+
+    def getAPI(self, firstDay, lastDay):
+        url = "https://weatherapi-com.p.rapidapi.com/history.json"
+
+        querystring = {"q":"New York City","dt":str(firstDay),"lang":"en","end_dt":str(lastDay)}
+
+        headers = {
+            'x-rapidapi-host': "weatherapi-com.p.rapidapi.com",
+            'x-rapidapi-key': "9820a61121msh455f660925d6a64p10cbaejsn39426eafe602"
+            }
+
+        response = requests.request("GET", url, headers=headers, params=querystring)
+        responseJSON = response.json()
+        return responseJSON
 
     def getWeather(self, year, weekNum):
         # Convert weekNum to range between two days
         firstDay = datetime.strptime(f'{year}-W{int(weekNum)-1}-1', '%Y-W%W-%w').date()
-        lastDay = firstDay + datetime.timedelta(days=6.9)
+        lastDay = firstDay + timedelta(days=6.9)
+
         # Use Try / Except to catch problems
         # Query API for weather in that week range
+        responseJSON = self.getAPI(firstDay, lastDay)
+        weather = {}
+        dateRange = [0,1,2,3,4,5,6]
+        for x in range(len(dateRange)):
+            try:
+                oneDay = responseJSON['forecast']['forecastday'][x]['day']['condition']['text']
+                weather[x] = oneDay
+            except IndexError:
+                weather[x] = 'No weather info'
         # Format weather information and return weather string.
-
+        return weather
+        
     def viewCurrentWeek(self): #needs to return week and weather
         # Use the Datetime Module to look up current week and year
         today = datetime.today()
         year, weekNum, day_of_week = today.isocalendar()
         # Ask user if they want to get the weather
-        try:
-            forecast = str(input("Would you like to see this week's weather? [y/n]: "))
-            # If yes, use your getWeather function and display results
-            if forecast == 'y':
-                print("Get weather API here.")
-                pass
-            elif forecast == 'n':
-                # Use your displayHolidaysInWeek function to display the holidays in the week
-                # filter_holidays_by_week function is called inside display function
-                self.displayHolidaysInWeek(year, weekNum)
-        except:
-            print("Please enter y or n.")
+        while True:
+            forecast = input("Would you like to see this week's weather? [y/n]: ")
+            if forecast in 'yn':
+                break
+            else:
+                print("Not proper character.")
+        # If yes, use your getWeather function and display results
+        if forecast == 'y':
+            try:
+                weather = self.getWeather(year, weekNum) #returns dict of weather information
+                print(weather)
+                self.displayHolidaysInWeek(year, weekNum, weather)
+            except:
+                print("Something went wrong with retrieving the weather or displaying the holidays.")
+        elif forecast == 'n':
+            # Use your displayHolidaysInWeek function to display the holidays in the week
+            # filter_holidays_by_week function is called inside display function
+            self.displayHolidaysInWeek(year, weekNum)
 
 # 1. Initialize HolidayList Object
 listObj = HolidayList() #the actual thing that yyou change
@@ -210,7 +246,6 @@ def viewHolidays():
         if pickedWeek == '':
             listObj.viewCurrentWeek()
         elif pickedWeek < 53 and pickedWeek > 0:
-            print("test")
             listObj.displayHolidaysInWeek(pickedYear, pickedWeek)
         else:
             print("Pick a number from 1 to 52.")
