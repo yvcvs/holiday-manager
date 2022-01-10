@@ -14,10 +14,16 @@ from dateutil.parser import parse
 @dataclass
 class Holiday:
     name: str
-    date: datetime
+    date: datetime.date
 
     def __str__ (self):
         return f"{self.name} ({self.date})"
+
+    def __repr__(self):
+        return {self.name, str(self.date)}
+
+    def JSONFormat(self):
+        return {'name':self.name, 'date': str(self.date)}
 
 class HolidayList:
     def __init__(self):
@@ -32,32 +38,26 @@ class HolidayList:
                     print("That's already in the list of holidays!")
                 # Use innerHolidays.append(holidayObj) to add holiday
                 else:
-                    holidayObj = holidayObj.__dict__
                     self.innerHolidays.append(holidayObj)
         except:
             print("That's not a holiday.")
-        return print("The holiday list has been updated.")
+        return
 
-    def findHoliday(self, chosenHoliday):
-        try:
-            # Find Holiday in innerHolidays
-            if chosenHoliday not in self.innerHolidays:
-                print(f'{chosenHoliday} is not found.')
-            else:
-            # Return Holiday
-                return chosenHoliday
-        except:
-            print(f'Error:\n{chosenHoliday} not found.')
+    def findHoliday(self, chosenName):
+        for holiday in self.innerHolidays:
+            if chosenName == holiday.name:
+                return holiday
+        else:
+            print("Not found.")
 
     def removeHoliday(self, chosenHoliday):
         try:
             # Find Holiday in innerHolidays by searching
             foundHoliday = self.findHoliday(chosenHoliday)
-            name = foundHoliday['name']
             # remove the Holiday from innerHolidays
             self.innerHolidays.remove(foundHoliday)
             # inform user you deleted the holiday
-            print(f'Success:\n{name} has been removed from the holiday list.')
+            print(f'Success:\n{foundHoliday.name} has been removed from the holiday list.')
         except:
             print(f'Error:\n{chosenHoliday} not found.')
 
@@ -66,9 +66,8 @@ class HolidayList:
         filelocation =  open('holidays.json')
         data = json.load(filelocation)
         for i in data['holidays']:
-            date = parse(i['date'])
-            date = date.strptime(i['date'], '%Y-%m-%d')
-            holidayObj = Holiday(i['name'], i['date'])
+            date = datetime.date(parse(i['date']))
+            holidayObj = Holiday(i['name'], date)
             # Use addHoliday function to add holidays to inner list.
             self.addHoliday(holidayObj)
 
@@ -80,7 +79,10 @@ class HolidayList:
             if double_check == 'y':
                 # Write out json file to selected file.
                 with open('holidays.json', 'w') as holidays:
-                    json.dump({'holidays': self.innerHolidays}, holidays, indent=4)
+                    finalList = []
+                    for x in self.innerHolidays:
+                        finalList.append(x.JSONFormat())
+                    json.dump({'holidays': finalList}, holidays, indent=4)
                 print("Success:\nThe holiday list file has been saved.")
             if double_check == 'n':
                 print("Canceled\nHoliday list file save canceled.")
@@ -103,13 +105,12 @@ class HolidayList:
                         name = row.find('a').string
                         hd = row.find('th').string
                         hd_updated = f'{hd}, {x}'
-                        hd_string = parse(hd_updated)
-                        date = hd_string.strftime('%Y-%m-%d')
-                        holidayEntry = Holiday(name, date).__dict__
+                        date = datetime.date(parse(hd_updated))
+                        holidayEntry = Holiday(name, date)
                         # Check to see if name and date of holiday is in innerHolidays array
                         # Add non-duplicates to innerHolidays
                         if holidayEntry not in self.innerHolidays:
-                            self.innerHolidays.append(holidayEntry)
+                            self.addHoliday(holidayEntry)
                         else:
                             continue
             except:
@@ -122,34 +123,22 @@ class HolidayList:
         print(f'There are {total_holidays} holidays stored in the system.')
 
     def filter_holidays_by_week(self, year, weekNum):
-        #use weekNum to find first and last day
-        firstDay = datetime.strptime(f'{year}-W{int(weekNum)-1}-1', '%Y-W%W-%w').date()
-        lastDay = firstDay + timedelta(days=6.9)
-        delta = lastDay - firstDay
-        #find dates in the weekNum
-        dates = []
-        for i in range(delta.days + 1):
-            day = firstDay + timedelta(days = i)
-            dates.append(day.strftime('%Y-%m-%d'))
+        filtered = list(filter(lambda x: x.date.isocalendar()[1] == int(weekNum) and x.date.isocalendar()[0] == int(year), self.innerHolidays))
         # Use a Lambda function to filter by week number and save this as holidays, use the filter on innerHolidays
-        # Cast filter results as list
-        results = filter(lambda x: x['date'] in dates, self.innerHolidays)
-        weekHolidays = list(results)
         # return your holidays
-        return weekHolidays
+        return filtered
 
     def displayHolidaysInWeek(self, pickedYear, pickedWeek, weather=None):
-        
         holidaysInWeek = self.filter_holidays_by_week(pickedYear, pickedWeek) #returns list of holidays
         if weather is None:# Use your filter_holidays_by_week to get list of holidays within a week as a parameter
             # Output formated holidays in the week.
             print(f'These are the holidays for week {pickedWeek}:')
             for x in holidaysInWeek:
-                print(Holiday(x['name'], x['date']))
+                print(x)
         else:
             print(f'These are the holidays for week {pickedWeek}:')
             for x in holidaysInWeek:
-                print(Holiday(x['name'], x['date']))
+                print(x)
 
     def getAPI(self, firstDay, lastDay):
         url = "https://weatherapi-com.p.rapidapi.com/history.json"
@@ -169,10 +158,10 @@ class HolidayList:
         # Convert weekNum to range between two days
         firstDay = datetime.strptime(f'{year}-W{int(weekNum)-1}-1', '%Y-W%W-%w').date()
         lastDay = firstDay + timedelta(days=6.9)
-
         # Use Try / Except to catch problems
         # Query API for weather in that week range
         responseJSON = self.getAPI(firstDay, lastDay)
+
         weather = {}
         dateRange = [0,1,2,3,4,5,6]
         for x in range(len(dateRange)):
@@ -221,36 +210,28 @@ def addMenuOption():
     print('Add a Holiday\n=============')
     name = str(input('Holiday: '))
     date = str(input('Date [YYYY-MM-DD format]: '))
-    date = parse(date)
-    date = date.strftime('%Y-%m-%d')
+    date = datetime.date(date)
     holidayObj = Holiday(name, date)
     listObj.addHoliday(holidayObj)
 
 def removeHoliday():
     print('Remove a Holiday\n================')
-    holidayName = str(input("Holiday Name: "))
-    date = str(input("Holiday Date [YYYY-MM-DD format]: "))
-    date = parse(date)
-    holidayDate = date.strftime('%Y-%m-%d')
-    chosenHoliday = Holiday(holidayName, holidayDate).__dict__
-    listObj.removeHoliday(chosenHoliday)
+    holidayName = input("Holiday Name: ")
+    listObj.removeHoliday(holidayName)
 
 def save():
     listObj.save_to_json()
 
 def viewHolidays():
     print("View Holidays\n=================")
-    pickedYear = str(input("Which year? "))
+    pickedYear = input("Which year? ")
     pickedWeek = input("Which week? [1-52, Leave blank for current week]: ")
-    try:
-        if pickedWeek == '':
-            listObj.viewCurrentWeek()
-        elif pickedWeek < 53 and pickedWeek > 0:
-            listObj.displayHolidaysInWeek(pickedYear, pickedWeek)
-        else:
-            print("Pick a number from 1 to 52.")
-    except:
-        print("Error:\nWas not able to display the week's holidays.")
+    if pickedWeek == '':
+        listObj.viewCurrentWeek()
+    elif int(pickedWeek) < 53 and int(pickedWeek) > 0:
+        listObj.displayHolidaysInWeek(pickedYear, pickedWeek)
+    else:
+        print("Pick a number from 1 to 52.")
 
 #main menu
 def main():
