@@ -209,9 +209,10 @@ def getHTML(fullURL):
 def addMenuOption():
     print('Add a Holiday\n=============')
     name = str(input('Holiday: '))
-    date = str(input('Date [YYYY-MM-DD format]: '))
-    date = datetime.date(date)
-    holidayObj = Holiday(name, date)
+    inputDate = str(input('Date [YYYY-MM-DD format]: '))
+    inputDate = parse(inputDate)
+    inputDate = datetime.date(inputDate)
+    holidayObj = Holiday(name, inputDate)
     listObj.addHoliday(holidayObj)
 
 def removeHoliday():
